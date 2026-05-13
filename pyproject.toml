@@ -1,0 +1,6 @@
+[project]
+name = "beauty-tutti"
+version = "0.1.0"
+description = "BEAUTY TUTTI MVP workspace"
+requires-python = ">=3.11"
+dependencies = []
