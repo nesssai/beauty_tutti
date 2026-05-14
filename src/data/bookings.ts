@@ -43,7 +43,6 @@ export function buildInitialBookings(now = new Date()): Booking[] {
       endIso: at(d2, 12, 0),
       clientName: 'Дарья К.',
       status: 'scheduled',
-      userId: 'u_maria',
     },
   ]
 }

@@ -33,6 +33,8 @@ export type Booking = {
   clientPhone?: string
   status: VisitStatus
   userId?: string
+  /** Заметка мастера к записи (MVP в памяти). */
+  masterNote?: string
 }
 
 export type DemoUser = {
@@ -41,7 +43,17 @@ export type DemoUser = {
   email: string
   phone: string
   firstVisitDiscountUsed: boolean
+  /** Пароль хранится только для демо/MVP без бэкенда. */
+  password?: string
 }
 
-/** Кто сейчас в приложении: выбор на входе, клиент или мастер. */
-export type AppViewer = 'landing' | 'client' | 'master'
+/** Интервал, когда мастер недоступен для записи. */
+export type MasterBlockedInterval = {
+  id: string
+  masterId: string
+  startIso: string
+  endIso: string
+}
+
+/** Кто сейчас в приложении: клиент (в т.ч. гость) или мастер. */
+export type AppViewer = 'client' | 'master'

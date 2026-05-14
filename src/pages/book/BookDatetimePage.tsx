@@ -8,7 +8,7 @@ import { getSlotsForBooking } from '@/utils/schedule'
 
 export function BookDatetimePage() {
   const navigate = useNavigate()
-  const { draft, setDraft, bookings } = useBookingApp()
+  const { draft, setDraft, bookings, blockedIntervals } = useBookingApp()
   const [pickedDay, setPickedDay] = useState<Date>(() => draft.day ?? startOfToday())
 
   const days = useMemo(() => {
@@ -23,8 +23,9 @@ export function BookDatetimePage() {
       masterId: draft.masterId,
       serviceId: draft.serviceId,
       bookings,
+      blocked: blockedIntervals,
     })
-  }, [bookings, draft.masterId, draft.serviceId, pickedDay])
+  }, [bookings, blockedIntervals, draft.masterId, draft.serviceId, pickedDay])
 
   const selectedSlot = draft.slotStart
   const canGoConfirm =

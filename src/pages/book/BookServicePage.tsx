@@ -27,11 +27,11 @@ export function BookServicePage() {
                 })
                 navigate('/book/salon')
               }}
-              className={[
+                className={[
                 'rounded-xl border p-4 text-left transition',
                 active
-                  ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-200'
-                  : 'border-stone-200 bg-white hover:border-brand-300',
+                  ? 'border-[color:var(--accent)]/40 bg-[var(--accent-soft)] ring-2 ring-[color:var(--accent)]/25'
+                  : 'border-stone-200/90 bg-white hover:border-[color:var(--accent)]/35',
               ].join(' ')}
             >
               <p className="font-medium text-stone-900">{s.name}</p>

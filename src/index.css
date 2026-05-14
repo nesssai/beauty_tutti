@@ -9,6 +9,14 @@
   --color-brand-900: #831843;
 }
 
+:root {
+  --page-bg: #faf7f8;
+  --accent: #d489a4;
+  --accent-soft: #fce8f0;
+  --accent-strong: #a14d6d;
+}
+
 body {
-  @apply bg-stone-50 text-stone-900 antialiased;
+  @apply antialiased text-stone-900;
+  background: var(--page-bg);
 }

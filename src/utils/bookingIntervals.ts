@@ -1,6 +1,6 @@
 import { isSameDay, parseISO } from 'date-fns'
 
-import type { Booking } from '@/types/models'
+import type { Booking, MasterBlockedInterval } from '@/types/models'
 
 import type { TimeInterval } from './slots'
 
@@ -15,6 +15,19 @@ export function bookingsToBusyIntervals(
         b.masterId === masterId &&
         b.status !== 'cancelled' &&
         isSameDay(parseISO(b.startIso), day),
+    )
+    .map((b) => ({ start: parseISO(b.startIso), end: parseISO(b.endIso) }))
+}
+
+export function blockedToBusyIntervals(
+  blocked: MasterBlockedInterval[],
+  masterId: string,
+  day: Date,
+): TimeInterval[] {
+  return blocked
+    .filter(
+      (b) =>
+        b.masterId === masterId && isSameDay(parseISO(b.startIso), day),
     )
     .map((b) => ({ start: parseISO(b.startIso), end: parseISO(b.endIso) }))
 }

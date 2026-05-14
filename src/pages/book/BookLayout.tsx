@@ -53,8 +53,8 @@ export function BookLayout() {
                 [
                   'inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset',
                   isActive
-                    ? 'bg-rose-600 text-white ring-rose-600'
-                    : 'bg-white text-stone-800 ring-stone-300 hover:bg-stone-50',
+                    ? 'bg-[var(--accent)] text-white ring-[var(--accent)]'
+                    : 'bg-white text-stone-800 ring-stone-300 hover:bg-[var(--accent-soft)]',
                 ].join(' ')
               }
             >

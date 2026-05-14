@@ -7,6 +7,7 @@ import { BookingProvider } from '@/context/BookingContext'
 import { AccountPage } from '@/pages/AccountPage'
 import { ClientHomePage } from '@/pages/ClientHomePage'
 import { ClientLoginPage } from '@/pages/ClientLoginPage'
+import { ClientRegisterPage } from '@/pages/ClientRegisterPage'
 import { LandingPage } from '@/pages/LandingPage'
 import { MasterLoginPage } from '@/pages/MasterLoginPage'
 import { MasterPage } from '@/pages/MasterPage'
@@ -26,6 +27,8 @@ export default function App() {
           <Route path="/welcome" element={<LandingPage />} />
           <Route path="/login/client" element={<ClientLoginPage />} />
           <Route path="/login/master" element={<MasterLoginPage />} />
+          <Route path="/login/master/:masterId" element={<MasterLoginPage />} />
+          <Route path="/register/client" element={<ClientRegisterPage />} />
           <Route path="/" element={<RootRedirect />} />
           <Route element={<RequireClient />}>
             <Route element={<ClientLayout />}>
@@ -45,7 +48,7 @@ export default function App() {
           <Route path="/master" element={<MasterShell />}>
             <Route index element={<MasterPage />} />
           </Route>
-          <Route path="*" element={<Navigate to="/welcome" replace />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </BrowserRouter>
     </BookingProvider>
