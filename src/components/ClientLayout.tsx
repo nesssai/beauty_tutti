@@ -4,28 +4,26 @@ import { useBookingApp } from '@/context/BookingContext'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   [
-    'rounded-lg px-3 py-2 text-sm font-medium transition',
-    isActive
-      ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]'
-      : 'text-stone-600 hover:bg-white/80 hover:text-stone-900',
+    'rounded-2xl px-4 py-2.5 text-base font-semibold transition duration-200',
+    isActive ? 'nav-link-active' : 'text-stone-600 hover:bg-white/70 hover:text-stone-900',
   ].join(' ')
 
 export function ClientLayout() {
   const navigate = useNavigate()
-  const { demoUser, logoutClient } = useBookingApp()
+  const { demoUser, logout } = useBookingApp()
 
   return (
-    <div className="min-h-screen bg-[var(--page-bg)]">
-      <header className="border-b border-stone-200/80 bg-white/90 shadow-sm backdrop-blur-sm">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
+    <div className="min-h-screen">
+      <header className="site-header sticky top-0 z-40">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:py-5">
+          <div className="flex flex-wrap items-center gap-4">
             <NavLink
               to="/home"
-              className="text-lg font-semibold tracking-tight text-[var(--accent-strong)]"
+              className="text-xl font-extrabold tracking-tight text-[var(--accent-strong)] sm:text-2xl"
             >
               BEAUTY TUTTI
             </NavLink>
-            <nav className="flex flex-wrap gap-1">
+            <nav className="flex flex-wrap gap-1.5">
               <NavLink to="/home" className={linkClass}>
                 Главная
               </NavLink>
@@ -33,48 +31,36 @@ export function ClientLayout() {
                 Запись
               </NavLink>
               <NavLink to="/account" className={linkClass}>
-                Личный кабинет
+                Кабинет
               </NavLink>
             </nav>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             {!demoUser ? (
               <>
-                <Link
-                  to="/login/client"
-                  className="rounded-lg border border-stone-200/90 bg-white px-3 py-1.5 text-sm font-medium text-stone-800 shadow-sm transition hover:border-[var(--accent)]/40 hover:text-[var(--accent-strong)]"
-                >
+                <Link to="/login" className="btn-secondary text-base">
                   Войти
                 </Link>
-                <Link
-                  to="/register/client"
-                  className="rounded-lg bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
-                >
-                  Зарегистрироваться
+                <Link to="/register/client" className="btn-primary text-base">
+                  Регистрация
                 </Link>
               </>
             ) : (
               <button
                 type="button"
-                className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 transition hover:bg-stone-50"
+                className="btn-secondary"
                 onClick={() => {
-                  logoutClient()
+                  logout()
                   navigate('/home', { replace: true })
                 }}
               >
                 Выйти
               </button>
             )}
-            <Link
-              to="/login/master"
-              className="text-xs text-stone-500 underline-offset-2 hover:text-stone-700 hover:underline"
-            >
-              Вход для мастера
-            </Link>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:py-12">
         <Outlet />
       </main>
     </div>

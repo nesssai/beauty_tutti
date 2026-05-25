@@ -7,24 +7,18 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { addMinutes, parseISO } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 
-import { buildInitialBookings } from '@/data/bookings'
-import {
-  CLIENT_DEMO_EMAIL,
-  CLIENT_DEMO_PASSWORD,
-  MASTER_CREDENTIALS,
-} from '@/data/authDemo'
-import { SERVICES } from '@/data/services'
-import { DEMO_USERS } from '@/data/users'
+import { api, ApiError, setToken } from '@/api/client'
 import type {
   AppViewer,
   Booking,
   DemoUser,
+  Master,
   MasterBlockedInterval,
+  Salon,
+  Service,
 } from '@/types/models'
-import { bookingOverlapsExisting } from '@/utils/schedule'
-import { intervalsOverlap } from '@/utils/slots'
 import {
   isValidEmail,
   isValidPassword,
@@ -42,28 +36,43 @@ export type BookingDraft = {
 
 export type MasterSession = {
   masterId: string
+  name: string
+}
+
+export type CatalogData = {
+  services: Service[]
+  salons: Salon[]
+  masters: Master[]
 }
 
 type BookingContextValue = {
+  ready: boolean
+  apiError: string | null
+  catalog: CatalogData
   viewer: AppViewer
   demoUser: DemoUser | null
   masterSession: MasterSession | null
-  setDemoUser: (u: DemoUser | null) => void
-  loginClient: (email: string, password: string) => boolean
+  login: (
+    identifier: string,
+    password: string,
+  ) => Promise<'client' | 'master' | null>
   registerClient: (payload: {
     name: string
     email: string
     phone: string
     password: string
-  }) => { ok: true } | { ok: false; error: string }
-  loginMaster: (masterId: string, login: string, password: string) => boolean
-  logoutClient: () => void
-  logoutMaster: () => void
+  }) => Promise<{ ok: true } | { ok: false; error: string }>
+  logout: () => void
   bookings: Booking[]
   blockedIntervals: MasterBlockedInterval[]
+  refreshBookings: () => Promise<void>
   draft: BookingDraft
   setDraft: (patch: Partial<BookingDraft>) => void
   resetDraft: () => void
+  checkExistingClient: (
+    email: string,
+    phone: string,
+  ) => Promise<{ exists: boolean; message?: string }>
   addBooking: (payload: {
     serviceId: string
     salonId: string
@@ -73,52 +82,115 @@ type BookingContextValue = {
     clientEmail?: string
     clientPhone?: string
     userId?: string
-  }) => boolean
-  /** Мастер вручную: только «запланирован» или «отменён». */
-  updateBookingStatus: (id: string, status: 'scheduled' | 'cancelled') => void
-  updateBookingMasterNote: (id: string, note: string) => void
-  markFirstVisitDiscountUsed: () => void
-  cancelClientBooking: (id: string) => { ok: true } | { ok: false; error: string }
+  }) => Promise<
+    | { ok: true; booking: Booking }
+    | { ok: false; error: string; requiresLogin?: boolean }
+  >
+  updateBookingStatus: (id: string, status: 'scheduled' | 'cancelled') => Promise<void>
+  updateBookingMasterNote: (id: string, note: string) => Promise<void>
+  cancelClientBooking: (id: string) => Promise<{ ok: true } | { ok: false; error: string }>
   addMasterBlockedInterval: (payload: {
     masterId: string
     start: Date
     end: Date
-  }) => { ok: true } | { ok: false; error: string }
-  removeMasterBlockedInterval: (id: string) => void
+  }) => Promise<{ ok: true } | { ok: false; error: string }>
+  removeMasterBlockedInterval: (id: string) => Promise<void>
+  fetchSlotsForDay: (
+    masterId: string,
+    serviceId: string,
+    day: Date,
+  ) => Promise<Date[]>
 }
 
 const BookingContext = createContext<BookingContextValue | null>(null)
 
-function syncCompletedBookings(list: Booking[]): Booking[] {
-  const now = Date.now()
-  return list.map((b) => {
-    if (b.status !== 'scheduled') return b
-    if (parseISO(b.endIso).getTime() <= now) {
-      return { ...b, status: 'completed' as const }
-    }
-    return b
-  })
-}
+const emptyCatalog: CatalogData = { services: [], salons: [], masters: [] }
 
 export function BookingProvider({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+  const [catalog, setCatalog] = useState<CatalogData>(emptyCatalog)
   const [viewer, setViewer] = useState<AppViewer>('client')
   const [demoUser, setDemoUser] = useState<DemoUser | null>(null)
   const [masterSession, setMasterSession] = useState<MasterSession | null>(null)
-  const [registeredUsers, setRegisteredUsers] = useState<DemoUser[]>(() =>
-    DEMO_USERS.map((u) => ({ ...u })),
-  )
-  const [bookings, setBookings] = useState<Booking[]>(() => buildInitialBookings())
+  const [bookings, setBookings] = useState<Booking[]>([])
   const [blockedIntervals, setBlockedIntervals] = useState<MasterBlockedInterval[]>([])
   const [draft, setDraftState] = useState<BookingDraft>({})
 
-  useEffect(() => {
-    const tick = () => {
-      setBookings((prev) => syncCompletedBookings(prev))
+  const refreshBookings = useCallback(async () => {
+    try {
+      const list = await api.getBookings()
+      setBookings(list)
+    } catch (e) {
+      if (e instanceof ApiError) setApiError(e.message)
     }
-    tick()
-    const id = window.setInterval(tick, 60_000)
-    return () => window.clearInterval(id)
   }, [])
+
+  const refreshBlocked = useCallback(async (masterId?: string) => {
+    try {
+      const list = await api.getBlocked(masterId)
+      setBlockedIntervals(list)
+    } catch {
+      /* optional */
+    }
+  }, [])
+
+  const applyAuth = useCallback((auth: Awaited<ReturnType<typeof api.me>>) => {
+    if (auth.role === 'client' && auth.client) {
+      setDemoUser({
+        id: auth.client.id,
+        name: auth.client.name,
+        email: auth.client.email,
+        phone: auth.client.phone,
+        firstVisitDiscountUsed: auth.client.firstVisitDiscountUsed,
+      })
+      setMasterSession(null)
+      setViewer('client')
+    } else if (auth.role === 'master' && auth.master) {
+      setDemoUser(null)
+      setMasterSession({
+        masterId: auth.master.masterId,
+        name: auth.master.name,
+      })
+      setViewer('master')
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        await api.health()
+        const cat = await api.getCatalog()
+        if (cancelled) return
+        setCatalog(cat)
+        try {
+          const me = await api.me()
+          if (!cancelled) applyAuth(me)
+        } catch {
+          /* not logged in */
+        }
+        await refreshBookings()
+        if (!cancelled) setReady(true)
+      } catch {
+        if (!cancelled) {
+          setApiError(
+            'Не удалось подключиться к серверу. Запустите API: uv run beauty-api',
+          )
+          setReady(true)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [applyAuth, refreshBookings])
+
+  useEffect(() => {
+    if (viewer === 'master' && masterSession) {
+      void refreshBlocked(masterSession.masterId)
+    }
+  }, [viewer, masterSession, refreshBlocked])
 
   const setDraft = useCallback((patch: Partial<BookingDraft>) => {
     setDraftState((s) => ({ ...s, ...patch }))
@@ -126,39 +198,49 @@ export function BookingProvider({ children }: { children: ReactNode }) {
 
   const resetDraft = useCallback(() => setDraftState({}), [])
 
-  const loginClient = useCallback((email: string, password: string) => {
-    const normalized = email.trim().toLowerCase()
-    if (
-      normalized === CLIENT_DEMO_EMAIL.toLowerCase() &&
-      password === CLIENT_DEMO_PASSWORD
-    ) {
-      const u = registeredUsers.find(
-        (x) => x.email.toLowerCase() === CLIENT_DEMO_EMAIL.toLowerCase(),
-      )
-      if (u) {
-        setDemoUser({ ...u })
-        setViewer('client')
-        return true
+  const login = useCallback(
+    async (identifier: string, password: string) => {
+      try {
+        const res = await api.login(identifier.trim(), password)
+        setToken(res.token)
+        if (res.role === 'client' && res.client) {
+          setDemoUser({
+            id: res.client.id,
+            name: res.client.name,
+            email: res.client.email,
+            phone: res.client.phone,
+            firstVisitDiscountUsed: res.client.firstVisitDiscountUsed,
+          })
+          setMasterSession(null)
+          setViewer('client')
+        } else if (res.role === 'master' && res.master) {
+          setDemoUser(null)
+          setMasterSession({
+            masterId: res.master.masterId,
+            name: res.master.name,
+          })
+          setViewer('master')
+        }
+        await refreshBookings()
+        if (res.role === 'master' && res.master) {
+          await refreshBlocked(res.master.masterId)
+        }
+        return res.role === 'master' ? 'master' : 'client'
+      } catch (e) {
+        if (e instanceof ApiError) setApiError(e.message)
+        return null
       }
-    }
-    const found = registeredUsers.find(
-      (x) => x.email.trim().toLowerCase() === normalized,
-    )
-    if (found && found.password === password) {
-      setDemoUser({ ...found })
-      setViewer('client')
-      return true
-    }
-    return false
-  }, [registeredUsers])
+    },
+    [refreshBookings, refreshBlocked],
+  )
 
   const registerClient = useCallback(
-    (payload: {
+    async (payload: {
       name: string
       email: string
       phone: string
       password: string
-    }): { ok: true } | { ok: false; error: string } => {
+    }): Promise<{ ok: true } | { ok: false; error: string }> => {
       const name = payload.name.trim()
       const email = payload.email.trim().toLowerCase()
       const phone = normalizeRuPhoneFromDigits(payload.phone)
@@ -174,50 +256,58 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       if (!isValidPassword(payload.password)) {
         return { ok: false, error: 'Пароль: от 4 до 128 символов.' }
       }
-      if (registeredUsers.some((u) => u.email.toLowerCase() === email)) {
-        return { ok: false, error: 'Пользователь с таким email уже есть.' }
+      try {
+        const res = await api.register({
+          name,
+          email,
+          phone,
+          password: payload.password,
+        })
+        setToken(res.token)
+        if (res.client) {
+          setDemoUser({
+            id: res.client.id,
+            name: res.client.name,
+            email: res.client.email,
+            phone: res.client.phone,
+            firstVisitDiscountUsed: res.client.firstVisitDiscountUsed,
+          })
+          setViewer('client')
+        }
+        await refreshBookings()
+        return { ok: true }
+      } catch (e) {
+        const msg = e instanceof ApiError ? e.message : 'Ошибка регистрации.'
+        return { ok: false, error: msg }
       }
-      const user: DemoUser = {
-        id: `u_${crypto.randomUUID()}`,
-        name,
-        email,
-        phone,
-        firstVisitDiscountUsed: false,
-        password: payload.password,
-      }
-      setRegisteredUsers((prev) => [...prev, user])
-      setDemoUser(user)
-      setViewer('client')
-      return { ok: true }
     },
-    [registeredUsers],
+    [refreshBookings],
   )
 
-  const loginMaster = useCallback((masterId: string, login: string, password: string) => {
-    const cred = MASTER_CREDENTIALS[masterId]
-    if (!cred) return false
-    if (login.trim() === cred.login && password === cred.password) {
-      setMasterSession({ masterId })
-      setViewer('master')
-      setDemoUser(null)
-      return true
-    }
-    return false
-  }, [])
-
-  const logoutClient = useCallback(() => {
+  const logout = useCallback(() => {
+    setToken(null)
     setDemoUser(null)
-    setDraftState({})
-    setViewer('client')
-  }, [])
-
-  const logoutMaster = useCallback(() => {
     setMasterSession(null)
     setViewer('client')
+    setDraftState({})
+    void refreshBookings()
+  }, [refreshBookings])
+
+  const checkExistingClient = useCallback(async (email: string, phone: string) => {
+    try {
+      const res = await api.checkClient(email.trim(), phone)
+      return {
+        exists: res.exists && res.requiresLogin,
+        message: res.message,
+      }
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Ошибка проверки клиента.'
+      return { exists: false, message: msg }
+    }
   }, [])
 
   const addBooking = useCallback(
-    (payload: {
+    async (payload: {
       serviceId: string
       salonId: string
       masterId: string
@@ -227,192 +317,156 @@ export function BookingProvider({ children }: { children: ReactNode }) {
       clientPhone?: string
       userId?: string
     }) => {
-      const service = SERVICES.find((s) => s.id === payload.serviceId)
-      if (!service) return false
-      const end = addMinutes(payload.slotStart, service.durationMinutes)
-      const candidate = { start: payload.slotStart, end }
-
-      let added = false
-      setBookings((prev) => {
-        const synced = syncCompletedBookings(prev)
-        if (
-          bookingOverlapsExisting(
-            candidate,
-            synced,
-            payload.masterId,
-            blockedIntervals,
-          )
-        ) {
-          return synced
-        }
-        added = true
-        const booking: Booking = {
-          id: `b_${crypto.randomUUID()}`,
-          masterId: payload.masterId,
-          salonId: payload.salonId,
+      try {
+        const booking = await api.createBooking({
           serviceId: payload.serviceId,
-          startIso: payload.slotStart.toISOString(),
-          endIso: end.toISOString(),
+          salonId: payload.salonId,
+          masterId: payload.masterId,
+          slotStartIso: payload.slotStart.toISOString(),
           clientName: payload.clientName,
           clientEmail: payload.clientEmail,
           clientPhone: payload.clientPhone,
-          status: 'scheduled',
-          userId: payload.userId,
+        })
+        await refreshBookings()
+        if (payload.userId && demoUser?.id === payload.userId) {
+          setDemoUser((u) =>
+            u ? { ...u, firstVisitDiscountUsed: true } : u,
+          )
         }
-        return [...synced, booking]
-      })
-      return added
+        return { ok: true as const, booking }
+      } catch (e) {
+        if (e instanceof ApiError) {
+          return {
+            ok: false as const,
+            error: e.message,
+            requiresLogin: e.status === 403,
+          }
+        }
+        return { ok: false as const, error: 'Не удалось создать запись.' }
+      }
     },
-    [blockedIntervals],
+    [refreshBookings, demoUser],
   )
 
-  const updateBookingStatus = useCallback((id: string, status: 'scheduled' | 'cancelled') => {
-    setBookings((prev) =>
-      prev.map((b) => {
-        if (b.id !== id) return b
-        if (b.status === 'completed') return b
-        return { ...b, status }
-      }),
-    )
-  }, [])
+  const updateBookingStatus = useCallback(
+    async (id: string, status: 'scheduled' | 'cancelled') => {
+      await api.updateBookingStatus(id, status)
+      await refreshBookings()
+    },
+    [refreshBookings],
+  )
 
-  const updateBookingMasterNote = useCallback((id: string, note: string) => {
-    setBookings((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, masterNote: note } : b)),
-    )
-  }, [])
-
-  const markFirstVisitDiscountUsed = useCallback(() => {
-    setDemoUser((u) => {
-      if (!u) return u
-      const id = u.id
-      setRegisteredUsers((prev) =>
-        prev.map((x) => (x.id === id ? { ...x, firstVisitDiscountUsed: true } : x)),
-      )
-      return { ...u, firstVisitDiscountUsed: true }
-    })
-  }, [])
+  const updateBookingMasterNote = useCallback(
+    async (id: string, note: string) => {
+      await api.updateBookingNote(id, note)
+      await refreshBookings()
+    },
+    [refreshBookings],
+  )
 
   const cancelClientBooking = useCallback(
-    (id: string): { ok: true } | { ok: false; error: string } => {
-      if (!demoUser) return { ok: false, error: 'Войдите в аккаунт.' }
-      const b = bookings.find((x) => x.id === id)
-      if (!b || b.userId !== demoUser.id) {
-        return { ok: false, error: 'Запись не найдена.' }
+    async (id: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+      try {
+        await api.cancelBooking(id)
+        await refreshBookings()
+        return { ok: true }
+      } catch (e) {
+        const msg = e instanceof ApiError ? e.message : 'Не удалось отменить.'
+        return { ok: false, error: msg }
       }
-      const start = parseISO(b.startIso)
-      const now = new Date()
-      if (start.getTime() <= now.getTime()) {
-        return { ok: false, error: 'Нельзя отменить прошедшую запись.' }
-      }
-      if (start.getTime() - now.getTime() < 24 * 60 * 60 * 1000) {
-        return {
-          ok: false,
-          error: 'Отмена возможна не позднее чем за 24 часа до приёма.',
-        }
-      }
-      setBookings((prev) =>
-        prev.map((x) => (x.id === id ? { ...x, status: 'cancelled' as const } : x)),
-      )
-      return { ok: true }
     },
-    [bookings, demoUser],
+    [refreshBookings],
   )
 
   const addMasterBlockedInterval = useCallback(
-    (payload: {
+    async (payload: {
       masterId: string
       start: Date
       end: Date
-    }): { ok: true } | { ok: false; error: string } => {
-      if (payload.end.getTime() <= payload.start.getTime()) {
-        return { ok: false, error: 'Время окончания должно быть позже начала.' }
+    }): Promise<{ ok: true } | { ok: false; error: string }> => {
+      try {
+        await api.addBlocked({
+          masterId: payload.masterId,
+          startIso: payload.start.toISOString(),
+          endIso: payload.end.toISOString(),
+        })
+        await refreshBlocked(payload.masterId)
+        return { ok: true }
+      } catch (e) {
+        const msg = e instanceof ApiError ? e.message : 'Ошибка.'
+        return { ok: false, error: msg }
       }
-      const candidate = { start: payload.start, end: payload.end }
-      const clashBooking = bookings.some(
-        (b) =>
-          b.masterId === payload.masterId &&
-          b.status !== 'cancelled' &&
-          intervalsOverlap(candidate, {
-            start: parseISO(b.startIso),
-            end: parseISO(b.endIso),
-          }),
-      )
-      if (clashBooking) {
-        return { ok: false, error: 'На это время уже есть запись.' }
-      }
-      const clashBlock = blockedIntervals.some(
-        (b) =>
-          b.masterId === payload.masterId &&
-          intervalsOverlap(candidate, {
-            start: parseISO(b.startIso),
-            end: parseISO(b.endIso),
-          }),
-      )
-      if (clashBlock) {
-        return { ok: false, error: 'Пересечение с другим недоступным интервалом.' }
-      }
-      const row: MasterBlockedInterval = {
-        id: `blk_${crypto.randomUUID()}`,
-        masterId: payload.masterId,
-        startIso: payload.start.toISOString(),
-        endIso: payload.end.toISOString(),
-      }
-      setBlockedIntervals((prev) => [...prev, row])
-      return { ok: true }
     },
-    [bookings, blockedIntervals],
+    [refreshBlocked],
   )
 
-  const removeMasterBlockedInterval = useCallback((id: string) => {
-    setBlockedIntervals((prev) => prev.filter((b) => b.id !== id))
-  }, [])
+  const removeMasterBlockedInterval = useCallback(
+    async (id: string) => {
+      await api.removeBlocked(id)
+      if (masterSession) await refreshBlocked(masterSession.masterId)
+    },
+    [masterSession, refreshBlocked],
+  )
+
+  const fetchSlotsForDay = useCallback(
+    async (masterId: string, serviceId: string, day: Date) => {
+      const dayStr = format(day, 'yyyy-MM-dd')
+      const res = await api.getSlots(masterId, serviceId, dayStr)
+      return res.slots.map((iso) => parseISO(iso))
+    },
+    [],
+  )
 
   const value = useMemo(
     () => ({
+      ready,
+      apiError,
+      catalog,
       viewer,
       demoUser,
       masterSession,
-      setDemoUser,
-      loginClient,
+      login,
       registerClient,
-      loginMaster,
-      logoutClient,
-      logoutMaster,
+      logout,
       bookings,
       blockedIntervals,
+      refreshBookings,
       draft,
       setDraft,
       resetDraft,
+      checkExistingClient,
       addBooking,
       updateBookingStatus,
       updateBookingMasterNote,
-      markFirstVisitDiscountUsed,
       cancelClientBooking,
       addMasterBlockedInterval,
       removeMasterBlockedInterval,
+      fetchSlotsForDay,
     }),
     [
+      ready,
+      apiError,
+      catalog,
       viewer,
       demoUser,
       masterSession,
-      loginClient,
+      login,
       registerClient,
-      loginMaster,
-      logoutClient,
-      logoutMaster,
+      logout,
       bookings,
       blockedIntervals,
+      refreshBookings,
       draft,
       setDraft,
       resetDraft,
+      checkExistingClient,
       addBooking,
       updateBookingStatus,
       updateBookingMasterNote,
-      markFirstVisitDiscountUsed,
       cancelClientBooking,
       addMasterBlockedInterval,
       removeMasterBlockedInterval,
+      fetchSlotsForDay,
     ],
   )
 

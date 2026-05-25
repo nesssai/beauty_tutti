@@ -1,15 +1,20 @@
-import { MASTERS } from '@/data/masters'
-import { SALONS } from '@/data/salons'
+import type { CatalogData } from '@/context/BookingContext'
 
-export function salonsWithService(serviceId: string) {
+export function salonsWithService(catalog: CatalogData, serviceId: string) {
   const salonIds = new Set(
-    MASTERS.filter((m) => m.serviceIds.includes(serviceId)).map((m) => m.salonId),
+    catalog.masters
+      .filter((m) => m.serviceIds.includes(serviceId))
+      .map((m) => m.salonId),
   )
-  return SALONS.filter((s) => salonIds.has(s.id))
+  return catalog.salons.filter((s) => salonIds.has(s.id))
 }
 
-export function mastersForSalonAndService(salonId: string, serviceId: string) {
-  return MASTERS.filter(
+export function mastersForSalonAndService(
+  catalog: CatalogData,
+  salonId: string,
+  serviceId: string,
+) {
+  return catalog.masters.filter(
     (m) => m.salonId === salonId && m.serviceIds.includes(serviceId),
   )
 }

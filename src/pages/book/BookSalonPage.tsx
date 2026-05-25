@@ -5,14 +5,14 @@ import { salonsWithService } from '@/data/queries'
 
 export function BookSalonPage() {
   const navigate = useNavigate()
-  const { draft, setDraft } = useBookingApp()
+  const { draft, setDraft, catalog } = useBookingApp()
   const serviceId = draft.serviceId!
-  const salons = salonsWithService(serviceId)
+  const salons = salonsWithService(catalog, serviceId)
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-stone-900">Выбор салона</h2>
-      <div className="grid gap-3">
+    <div className="space-y-5 animate-fade-in">
+      <h2 className="page-subtitle">Выбор салона</h2>
+      <div className="grid gap-4 sm:grid-cols-2">
         {salons.map((salon) => {
           const active = draft.salonId === salon.id
           return (
@@ -28,15 +28,13 @@ export function BookSalonPage() {
                 })
                 navigate('/book/master')
               }}
-                className={[
-                'rounded-xl border p-4 text-left transition',
-                active
-                  ? 'border-[color:var(--accent)]/40 bg-[var(--accent-soft)] ring-2 ring-[color:var(--accent)]/25'
-                  : 'border-stone-200/90 bg-white hover:border-[color:var(--accent)]/35',
+              className={[
+                'service-card text-left',
+                active ? 'service-card-active' : '',
               ].join(' ')}
             >
-              <p className="font-medium text-stone-900">{salon.name}</p>
-              <p className="mt-1 text-sm text-stone-600">
+              <p className="text-lg font-semibold text-stone-900">{salon.name}</p>
+              <p className="mt-2 text-base text-stone-600">
                 {salon.city}, {salon.address}
               </p>
             </button>

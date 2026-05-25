@@ -5,13 +5,17 @@ import { mastersForSalonAndService } from '@/data/queries'
 
 export function BookMasterPage() {
   const navigate = useNavigate()
-  const { draft, setDraft } = useBookingApp()
-  const masters = mastersForSalonAndService(draft.salonId!, draft.serviceId!)
+  const { draft, setDraft, catalog } = useBookingApp()
+  const masters = mastersForSalonAndService(
+    catalog,
+    draft.salonId!,
+    draft.serviceId!,
+  )
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-stone-900">Выбор мастера</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-5 animate-fade-in">
+      <h2 className="page-subtitle">Выбор мастера</h2>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {masters.map((m) => {
           const active = draft.masterId === m.id
           return (
@@ -22,14 +26,15 @@ export function BookMasterPage() {
                 setDraft({ masterId: m.id, day: undefined, slotStart: undefined })
                 navigate('/book/datetime')
               }}
-                className={[
-                'rounded-xl border p-4 text-left transition',
-                active
-                  ? 'border-[color:var(--accent)]/40 bg-[var(--accent-soft)] ring-2 ring-[color:var(--accent)]/25'
-                  : 'border-stone-200/90 bg-white hover:border-[color:var(--accent)]/35',
+              className={[
+                'service-card text-left',
+                active ? 'service-card-active' : '',
               ].join(' ')}
             >
-              <p className="font-medium text-stone-900">{m.name}</p>
+              <p className="text-lg font-semibold text-stone-900">{m.name}</p>
+              <p className="mt-2 text-sm text-stone-500">
+                {m.serviceIds.length} услуг в зоне ответственности
+              </p>
             </button>
           )
         })}

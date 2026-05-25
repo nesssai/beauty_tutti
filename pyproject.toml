@@ -3,4 +3,14 @@ name = "beauty-tutti"
 version = "0.1.0"
 description = "BEAUTY TUTTI MVP workspace"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sqlalchemy>=2.0.36",
+    "bcrypt>=4.2.0",
+    "python-jose[cryptography]>=3.3.0",
+    "python-multipart>=0.0.12",
+]
+
+[project.scripts]
+beauty-api = "server.main:run"

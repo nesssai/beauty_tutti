@@ -1,57 +1,72 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { addDays, format, isSameDay, startOfToday } from 'date-fns'
 
 import { useBookingApp } from '@/context/BookingContext'
 import { formatRuDayChip } from '@/utils/formatRuWeekday'
-import { getSlotsForBooking } from '@/utils/schedule'
+import { isPastDay } from '@/utils/pastTime'
 
 export function BookDatetimePage() {
   const navigate = useNavigate()
-  const { draft, setDraft, bookings, blockedIntervals } = useBookingApp()
-  const [pickedDay, setPickedDay] = useState<Date>(() => draft.day ?? startOfToday())
+  const { draft, setDraft, fetchSlotsForDay } = useBookingApp()
+  const today = startOfToday()
+  const [pickedDay, setPickedDay] = useState<Date>(() => draft.day ?? today)
+  const [slots, setSlots] = useState<Date[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
 
   const days = useMemo(() => {
-    const start = startOfToday()
+    const start = today
     return Array.from({ length: 14 }, (_, i) => addDays(start, i))
-  }, [])
+  }, [today])
 
-  const slots = useMemo(() => {
-    if (!draft.masterId || !draft.serviceId) return []
-    return getSlotsForBooking({
-      day: pickedDay,
-      masterId: draft.masterId,
-      serviceId: draft.serviceId,
-      bookings,
-      blocked: blockedIntervals,
-    })
-  }, [bookings, blockedIntervals, draft.masterId, draft.serviceId, pickedDay])
+  useEffect(() => {
+    if (!draft.masterId || !draft.serviceId) return
+    let cancelled = false
+    setLoadingSlots(true)
+    void fetchSlotsForDay(draft.masterId, draft.serviceId, pickedDay)
+      .then((list) => {
+        if (!cancelled) setSlots(list)
+      })
+      .catch(() => {
+        if (!cancelled) setSlots([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSlots(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [draft.masterId, draft.serviceId, pickedDay, fetchSlotsForDay])
 
   const selectedSlot = draft.slotStart
   const canGoConfirm =
     selectedSlot != null && isSameDay(selectedSlot, pickedDay)
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-lg font-semibold text-stone-900">Дата и время</h2>
+    <div className="space-y-6 animate-fade-in">
+      <h2 className="page-subtitle">Дата и время</h2>
       <div>
-        <p className="text-sm font-medium text-stone-700">День</p>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <p className="text-base font-medium text-stone-700">День</p>
+        <div className="mt-3 flex flex-wrap gap-2">
           {days.map((d) => {
+            const past = isPastDay(d)
             const active = isSameDay(d, pickedDay)
             return (
               <button
                 key={d.toISOString()}
                 type="button"
+                disabled={past}
                 onClick={() => {
                   setPickedDay(d)
                   setDraft({ day: d, slotStart: undefined })
                 }}
                 className={[
-                  'rounded-lg border px-3 py-2 text-xs sm:text-sm',
-                  active
-                    ? 'border-rose-600 bg-rose-600 text-white'
-                    : 'border-stone-200 bg-white text-stone-800 hover:border-rose-400',
+                  'rounded-xl border px-4 py-2.5 text-sm font-medium transition',
+                  past
+                    ? 'cursor-not-allowed border-stone-100 bg-stone-100 text-stone-400'
+                    : active
+                      ? 'border-[var(--accent)] bg-[var(--accent)] text-white shadow-md'
+                      : 'border-stone-200 bg-white text-stone-800 hover:border-[var(--accent)]/50',
                 ].join(' ')}
               >
                 {formatRuDayChip(d)}
@@ -61,13 +76,15 @@ export function BookDatetimePage() {
         </div>
       </div>
       <div>
-        <p className="text-sm font-medium text-stone-700">Свободные слоты</p>
-        <p className="mt-1 text-xs text-stone-500">
-          Выберите время, затем нажмите «Перейти к подтверждению записи».
+        <p className="text-base font-medium text-stone-700">Свободные слоты</p>
+        <p className="mt-1 text-sm text-stone-500">
+          Прошедшее время недоступно для записи.
         </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {slots.length === 0 ? (
-            <p className="text-sm text-stone-500">Нет свободных окон в этот день.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {loadingSlots ? (
+            <p className="text-base text-stone-500">Загрузка слотов…</p>
+          ) : slots.length === 0 ? (
+            <p className="text-base text-stone-500">Нет свободных окон в этот день.</p>
           ) : (
             slots.map((t) => {
               const active =
@@ -78,14 +95,10 @@ export function BookDatetimePage() {
                 <button
                   key={t.toISOString()}
                   type="button"
-                  onClick={() => {
-                    setDraft({ day: pickedDay, slotStart: t })
-                  }}
+                  onClick={() => setDraft({ day: pickedDay, slotStart: t })}
                   className={[
-                    'rounded-lg border px-3 py-2 text-sm',
-                    active
-                      ? 'border-rose-600 bg-rose-50 text-rose-900'
-                      : 'border-stone-200 bg-white text-stone-800 hover:border-rose-400',
+                    'slot-chip',
+                    active ? 'slot-chip-active' : '',
                   ].join(' ')}
                 >
                   {format(t, 'HH:mm')}
@@ -95,16 +108,14 @@ export function BookDatetimePage() {
           )}
         </div>
       </div>
-      <div className="pt-2">
-        <button
-          type="button"
-          disabled={!canGoConfirm}
-          onClick={() => navigate('/book/confirm')}
-          className="inline-flex rounded-xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
-        >
-          Перейти к подтверждению записи
-        </button>
-      </div>
+      <button
+        type="button"
+        disabled={!canGoConfirm}
+        onClick={() => navigate('/book/confirm')}
+        className="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        Перейти к подтверждению записи
+      </button>
     </div>
   )
 }

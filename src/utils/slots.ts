@@ -1,4 +1,6 @@
-import { addMinutes, setHours, setMinutes, startOfDay } from 'date-fns'
+import { addMinutes, isSameDay, setHours, setMinutes, startOfDay } from 'date-fns'
+
+import { filterFutureSlots } from '@/utils/pastTime'
 
 export type TimeInterval = { start: Date; end: Date }
 
@@ -56,5 +58,8 @@ export function getAvailableSlotStarts(p: SlotGenerationParams): Date[] {
     cursor = addMinutes(cursor, step)
   }
 
+  if (isSameDay(p.day, new Date())) {
+    return filterFutureSlots(result)
+  }
   return result
 }

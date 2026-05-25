@@ -19,7 +19,8 @@ export function BookLayout() {
   }
 
   const guardSalon = location.pathname.includes('/book/salon') && !draft.serviceId
-  const guardMaster = location.pathname.includes('/book/master') && (!draft.serviceId || !draft.salonId)
+  const guardMaster =
+    location.pathname.includes('/book/master') && (!draft.serviceId || !draft.salonId)
   const guardDatetime =
     location.pathname.includes('/book/datetime') &&
     (!draft.serviceId || !draft.salonId || !draft.masterId)
@@ -36,12 +37,12 @@ export function BookLayout() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-stone-900">Онлайн-запись</h1>
-        <p className="mt-1 text-sm text-stone-600">
-          Пройдите шаги по порядку — система учитывает длительность услуги и
-          занятость мастера.
+    <div className="space-y-8 animate-fade-in">
+      <div className="card-panel">
+        <h1 className="page-title">Онлайн-запись</h1>
+        <p className="mt-2 text-base text-stone-600">
+          Пройдите шаги по порядку — система учитывает длительность услуги, занятость мастера
+          и не даёт записаться на прошедшее время.
         </p>
       </div>
       <ol className="flex flex-wrap gap-2">
@@ -51,7 +52,7 @@ export function BookLayout() {
               to={`/book/${s.path}`}
               className={({ isActive }) =>
                 [
-                  'inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset',
+                  'inline-flex rounded-full px-4 py-2 text-sm font-semibold ring-1 ring-inset transition',
                   isActive
                     ? 'bg-[var(--accent)] text-white ring-[var(--accent)]'
                     : 'bg-white text-stone-800 ring-stone-300 hover:bg-[var(--accent-soft)]',

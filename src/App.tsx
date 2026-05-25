@@ -3,13 +3,12 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ClientLayout } from '@/components/ClientLayout'
 import { MasterShell } from '@/components/MasterShell'
 import { RequireClient, RootRedirect } from '@/components/RouteGuards'
-import { BookingProvider } from '@/context/BookingContext'
+import { BookingProvider, useBookingApp } from '@/context/BookingContext'
 import { AccountPage } from '@/pages/AccountPage'
 import { ClientHomePage } from '@/pages/ClientHomePage'
-import { ClientLoginPage } from '@/pages/ClientLoginPage'
 import { ClientRegisterPage } from '@/pages/ClientRegisterPage'
 import { LandingPage } from '@/pages/LandingPage'
-import { MasterLoginPage } from '@/pages/MasterLoginPage'
+import { LoginPage } from '@/pages/LoginPage'
 import { MasterPage } from '@/pages/MasterPage'
 import { BookConfirmPage } from '@/pages/book/BookConfirmPage'
 import { BookDatetimePage } from '@/pages/book/BookDatetimePage'
@@ -19,15 +18,27 @@ import { BookMasterPage } from '@/pages/book/BookMasterPage'
 import { BookSalonPage } from '@/pages/book/BookSalonPage'
 import { BookServicePage } from '@/pages/book/BookServicePage'
 
+function ApiBanner() {
+  const { apiError, ready } = useBookingApp()
+  if (!ready || !apiError) return null
+  return (
+    <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-center text-base text-amber-900">
+      {apiError}
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <BookingProvider>
       <BrowserRouter>
+        <ApiBanner />
         <Routes>
           <Route path="/welcome" element={<LandingPage />} />
-          <Route path="/login/client" element={<ClientLoginPage />} />
-          <Route path="/login/master" element={<MasterLoginPage />} />
-          <Route path="/login/master/:masterId" element={<MasterLoginPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/login/client" element={<Navigate to="/login" replace />} />
+          <Route path="/login/master" element={<Navigate to="/login" replace />} />
+          <Route path="/login/master/:masterId" element={<Navigate to="/login" replace />} />
           <Route path="/register/client" element={<ClientRegisterPage />} />
           <Route path="/" element={<RootRedirect />} />
           <Route element={<RequireClient />}>
