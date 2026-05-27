@@ -9,6 +9,9 @@ const root = fileURLToPath(new URL('.', import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
+  // For GitHub Pages (project pages) we need a non-root base.
+  // Default '/' for local dev; override with VITE_BASE (e.g. '/beauty_tutti/').
+  base: process.env.VITE_BASE ?? '/',
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {

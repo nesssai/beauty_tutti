@@ -5,6 +5,24 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BEAUTY TUTTI</title>
+    <!-- GitHub Pages SPA fallback: restore deep-link after 404 redirect -->
+    <script>
+      (function () {
+        const url = new URL(window.location.href);
+        const p = url.searchParams.get('p');
+        if (!p) return;
+        url.searchParams.delete('p');
+        const hash = url.searchParams.get('h');
+        if (hash) url.searchParams.delete('h');
+        const restored =
+          url.origin +
+          url.pathname.replace(/\/$/, '') +
+          p +
+          (url.search ? url.search : '') +
+          (hash ? '#' + hash : '');
+        window.history.replaceState(null, '', restored);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

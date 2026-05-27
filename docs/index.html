@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/beauty_tutti/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BEAUTY TUTTI</title>
+    <!-- GitHub Pages SPA fallback: restore deep-link after 404 redirect -->
+    <script>
+      (function () {
+        const url = new URL(window.location.href);
+        const p = url.searchParams.get('p');
+        if (!p) return;
+        url.searchParams.delete('p');
+        const hash = url.searchParams.get('h');
+        if (hash) url.searchParams.delete('h');
+        const restored =
+          url.origin +
+          url.pathname.replace(/\/$/, '') +
+          p +
+          (url.search ? url.search : '') +
+          (hash ? '#' + hash : '');
+        window.history.replaceState(null, '', restored);
+      })();
+    </script>
+    <script type="module" crossorigin src="/beauty_tutti/assets/index-CCaJuxNU.js"></script>
+    <link rel="stylesheet" crossorigin href="/beauty_tutti/assets/index-93xRqcXG.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
