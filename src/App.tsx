@@ -31,7 +31,7 @@ function ApiBanner() {
 export default function App() {
   return (
     <BookingProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <ApiBanner />
         <Routes>
           <Route path="/welcome" element={<LandingPage />} />
