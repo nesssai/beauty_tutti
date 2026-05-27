@@ -79,7 +79,7 @@ export function ClientHomePage() {
 
             <div className="hero-image-frame">
               <img
-                src="/images/hero-beauty.jpg"
+                src={`${import.meta.env.BASE_URL}images/hero-beauty.jpg`}
                 alt="Эстетичный уход и косметология в салоне BEAUTY TUTTI"
                 className="hero-image"
                 width={560}
