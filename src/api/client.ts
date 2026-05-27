@@ -8,6 +8,11 @@ import type {
 } from '@/types/models'
 
 const TOKEN_KEY = 'bt_token'
+const API_ORIGIN = (import.meta as any).env?.VITE_API_ORIGIN?.toString?.() ?? ''
+
+export function apiOrigin() {
+  return API_ORIGIN as string
+}
 
 export type Catalog = {
   services: Service[]
@@ -46,7 +51,8 @@ async function request<T>(
   const token = getToken()
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`/api${path}`, { ...options, headers })
+  const url = `${API_ORIGIN}/api${path}`
+  const res = await fetch(url, { ...options, headers })
   if (!res.ok) {
     let detail = 'Ошибка сервера.'
     try {

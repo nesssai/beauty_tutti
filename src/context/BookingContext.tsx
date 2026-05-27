@@ -9,7 +9,10 @@ import {
 } from 'react'
 import { format, parseISO } from 'date-fns'
 
-import { api, ApiError, setToken } from '@/api/client'
+import { api, apiOrigin, ApiError, setToken } from '@/api/client'
+import { MASTERS } from '@/data/masters'
+import { SALONS } from '@/data/salons'
+import { SERVICES } from '@/data/services'
 import type {
   AppViewer,
   Booking,
@@ -159,6 +162,17 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
+      const origin = apiOrigin()
+      const isGitHubPages = window.location.hostname.endsWith('github.io')
+      if (isGitHubPages && !origin) {
+        // Static/demo mode for GitHub Pages (no backend available at /api).
+        setCatalog({ services: SERVICES, salons: SALONS, masters: MASTERS })
+        setApiError(
+          'Демо-режим: бэкенд недоступен на GitHub Pages. Для записи и входа запустите API отдельно и соберите сайт с VITE_API_ORIGIN.',
+        )
+        setReady(true)
+        return
+      }
       try {
         await api.health()
         const cat = await api.getCatalog()
@@ -174,8 +188,10 @@ export function BookingProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setReady(true)
       } catch {
         if (!cancelled) {
+          // Fallback catalog keeps UI usable even if API is down.
+          setCatalog({ services: SERVICES, salons: SALONS, masters: MASTERS })
           setApiError(
-            'Не удалось подключиться к серверу. Запустите API: uv run beauty-api',
+            'Не удалось подключиться к серверу. Запустите API локально или укажите VITE_API_ORIGIN при сборке.',
           )
           setReady(true)
         }
